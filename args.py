@@ -91,7 +91,46 @@ def get_train_args():
     parser = argparse.ArgumentParser('Train a model on SQuAD')
 
     add_common_args(parser)
-    add_train_test_args(parser)
+    # add_train_test_args(parser)
+    
+    parser.add_argument('--name',
+                        '-n',
+                        type=str,
+                        required=True,
+                        help='Name to identify training or test run.')
+    parser.add_argument('--max_ans_len',
+                        type=int,
+                        default=15,
+                        help='Maximum length of a predicted answer.')
+    parser.add_argument('--num_workers',
+                        type=int,
+                        default=4,
+                        help='Number of sub-processes to use per data loader.')
+    parser.add_argument('--save_dir',
+                        type=str,
+                        default='./save/',
+                        help='Base directory for saving information.')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=64,
+                        help='Batch size per GPU. Scales automatically when \
+                              multiple GPUs are available.')
+    parser.add_argument('--use_squad_v2',
+                        type=lambda s: s.lower().startswith('t'),
+                        default=True,
+                        help='Whether to use SQuAD 2.0 (unanswerable) questions.')
+    parser.add_argument('--hidden_size',
+                        type=int,
+                        default=100,
+                        help='Number of features in encoder hidden layers.')
+    parser.add_argument('--num_visuals',
+                        type=int,
+                        default=10,
+                        help='Number of examples to visualize in TensorBoard.')
+    parser.add_argument('--load_path',
+                        type=str,
+                        default=None,
+                        help='Path to load as a model checkpoint.')
 
     parser.add_argument('--eval_steps',
                         type=int,
@@ -154,8 +193,10 @@ def get_test_args():
     parser = argparse.ArgumentParser('Test a trained model on SQuAD')
 
     add_common_args(parser)
+
     add_train_test_args(parser)
 
+    
     parser.add_argument('--split',
                         type=str,
                         default='dev',
