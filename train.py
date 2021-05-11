@@ -111,6 +111,8 @@ def main(args):
                     # print('time out 1')
                     cnt = cnt.last_hidden_state[:,:,:50][0]
                     # print('time out 2')
+                    if(cnt.size(0))>400:
+                        cnt=cnt[:400,:]
                     cont_pad[ind,:cnt.size(0),:] = cnt
                     # print('time out 3')
                     cont_pad[ind,cnt.size(0):,:] = 0
@@ -121,6 +123,8 @@ def main(args):
                     que = tokenizer([qw_idxs[ind]], return_tensors="pt")
                     que = bert_model(**que)
                     que = que.last_hidden_state[:,:,:50][0]
+                    if que.size(0)>50:
+                      que = que[:50,:]
                     ques_pad[ind,:que.size(0),:] = que
                     ques_pad[ind,que.size(0):,:] = 0
                     del que
@@ -221,6 +225,8 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, bert_
                 # print('time out 1')
                 cnt = cnt.last_hidden_state[:,:,:50][0]
                 # print('time out 2')
+                if(cnt.size(0))>400:
+                    cnt=cnt[:400,:]
                 cont_pad[ind,:cnt.size(0),:] = cnt
                 # print('time out 3')
                 cont_pad[ind,cnt.size(0):,:] = 0
@@ -231,6 +237,8 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, bert_
                 que = tokenizer([qw_idxs[ind]], return_tensors="pt")
                 que = bert_model(**que)
                 que = que.last_hidden_state[:,:,:50][0]
+                if que.size(0)>50:
+                    que = que[:50,:]
                 ques_pad[ind,:que.size(0),:] = que
                 ques_pad[ind,que.size(0):,:] = 0
                 del que   

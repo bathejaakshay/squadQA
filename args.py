@@ -112,7 +112,7 @@ def get_train_args():
                         help='Base directory for saving information.')
     parser.add_argument('--batch_size',
                         type=int,
-                        default=8,
+                        default=16,
                         help='Batch size per GPU. Scales automatically when \
                               multiple GPUs are available.')
     parser.add_argument('--use_squad_v2',
@@ -264,7 +264,7 @@ def add_train_test_args(parser):
                         help='Base directory for saving information.')
     parser.add_argument('--batch_size',
                         type=int,
-                        default=8,
+                        default=16,
                         help='Batch size per GPU. Scales automatically when \
                               multiple GPUs are available.')
     parser.add_argument('--use_squad_v2',
