@@ -100,25 +100,40 @@ def main(args):
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, qw_idxs, y1, y2, ids in train_loader:
                 # Setup for forward
-                cnt_pad, ques_pad = [],[]
+                cont_pad = torch.empty(len(cw_idxs),400,50)
+                ques_pad = torch.empty(len(cw_idxs),50,50)
+                # cnt_pad, ques_pad = [],[]
+                # print('inside for')
                 for ind in range(len(cw_idxs)):
                     cnt = tokenizer([cw_idxs[ind]], return_tensors="pt")
+                    # print('time in')
                     cnt = bert_model(**cnt)
-                    cnt = cnt.last_hidden_state[:,:,:50]
-                    cnt_pad.append(cnt[0])
+                    # print('time out 1')
+                    cnt = cnt.last_hidden_state[:,:,:50][0]
+                    # print('time out 2')
+                    cont_pad[ind,:cnt.size(0),:] = cnt
+                    # print('time out 3')
+                    cont_pad[ind,cnt.size(0):,:] = 0
+                    # print('time out 4')
                     del cnt
+                    # print('time out 5')
+
                     que = tokenizer([qw_idxs[ind]], return_tensors="pt")
                     que = bert_model(**que)
-                    que = que.last_hidden_state[:,:,:50]
-                    ques_pad.append(que[0])
+                    que = que.last_hidden_state[:,:,:50][0]
+                    ques_pad[ind,:que.size(0),:] = que
+                    ques_pad[ind,que.size(0):,:] = 0
                     del que
-                cnt_pad = pad_sequence(cnt_pad).transpose(0,1) 
-                ques_pad = pad_sequence(ques_pad).transpose(0,1)   
-                cw_idxs = cnt_pad.float().to(device)
+                # print('outside for')
+                # cnt_pad = pad_sequence(cnt_pad).transpose(0,1) 
+                # ques_pad = pad_sequence(ques_pad).transpose(0,1)   
+                cw_idxs = cont_pad.float().to(device)
+                # print('deleting')
+                del cont_pad
                 qw_idxs = ques_pad.float().to(device)
-                print('deleting')
-                del cnt_pad
                 del ques_pad
+                # print('deleted')
+                
                 print(cw_idxs.shape)
                 print(qw_idxs.shape)
                 # cw_idxs = cw_idxs.to(device)
@@ -135,7 +150,7 @@ def main(args):
                 loss_val = loss.item()
 
                 # Backward
-                print(f' checking model {next(model.parameters()).is_cuda}')
+                # print(f' checking model {next(model.parameters()).is_cuda}')
                 print('back prop st')
                 loss.backward()
                 print('back prop done')
@@ -195,24 +210,34 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, bert_
         for cw_idxs, qw_idxs,y1, y2, ids in data_loader:
             # Setup for forward
             
-            cnt_pad, ques_pad = [],[]
-            cnt_pad, ques_pad = [],[]
+            cont_pad = torch.empty(len(cw_idxs),400,50)
+            ques_pad = torch.empty(len(cw_idxs),50,50)
+            # cnt_pad, ques_pad = [],[]
+            # print('inside for')
             for ind in range(len(cw_idxs)):
                 cnt = tokenizer([cw_idxs[ind]], return_tensors="pt")
+                # print('time in')
                 cnt = bert_model(**cnt)
-                cnt = cnt.last_hidden_state[:,:,:50]
-                cnt_pad.append(cnt[0])
+                # print('time out 1')
+                cnt = cnt.last_hidden_state[:,:,:50][0]
+                # print('time out 2')
+                cont_pad[ind,:cnt.size(0),:] = cnt
+                # print('time out 3')
+                cont_pad[ind,cnt.size(0):,:] = 0
+                # print('time out 4')
                 del cnt
+                # print('time out 5')
+
                 que = tokenizer([qw_idxs[ind]], return_tensors="pt")
                 que = bert_model(**que)
-                que = que.last_hidden_state[:,:,:50]
-                ques_pad.append(que[0])
-                del que
-            cnt_pad = pad_sequence(cnt_pad).transpose(0,1) 
-            ques_pad = pad_sequence(ques_pad).transpose(0,1)   
-            cw_idxs = cnt_pad.to(device)
-            qw_idxs = ques_pad.to(device)
-            del cnt_pad
+                que = que.last_hidden_state[:,:,:50][0]
+                ques_pad[ind,:que.size(0),:] = que
+                ques_pad[ind,que.size(0):,:] = 0
+                del que   
+            cw_idxs = cont_pad.float().to(device)
+            # print('deleting')
+            del cont_pad
+            qw_idxs = ques_pad.float().to(device)
             del ques_pad
             # cw_idxs = cw_idxs.to(device)
             # qw_idxs = qw_idxs.to(device)
