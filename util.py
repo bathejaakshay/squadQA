@@ -51,9 +51,12 @@ class SQuAD(data.Dataset):
         # self.context_char_idxs = torch.from_numpy(dataset['context_char_idxs']).long()
         # self.question_idxs = torch.from_numpy(dataset['ques_idxs']).long()
         # self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
-        self.context_embd = torch.from_numpy(dataset['cntxp'])
-        self.question_embd = torch.from_numpy(dataset['quesp'])
+        
+        # self.context_embd = torch.from_numpy(dataset['cont'])
+        # self.question_embd = torch.from_numpy(dataset['ques'])
 
+        self.context_embd = dataset['cont']
+        self.question_embd = dataset['ques']
         self.y1s = torch.from_numpy(dataset['y1s']).long()
         self.y2s = torch.from_numpy(dataset['y2s']).long()
 
@@ -78,8 +81,8 @@ class SQuAD(data.Dataset):
 
     def __getitem__(self, idx):
         idx = self.valid_idxs[idx]
-        example = (self.context_embd,
-                   self.question_embd,
+        example = (self.context_embd[idx],
+                   self.question_embd[idx],
                    self.y1s[idx],
                    self.y2s[idx],
                    self.ids[idx])

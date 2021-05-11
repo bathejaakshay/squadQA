@@ -10,7 +10,7 @@ Pre-processing code adapted from:
 Author:
     Chris Chute (chute@stanford.edu)
 """
-from transformers import BertTokenizer, BertModel
+# from transformers import BertTokenizer, BertModel
 import torch
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
@@ -245,7 +245,7 @@ def is_answerable(example):
     return len(example['y2s']) > 0 and len(example['y1s']) > 0
 
 
-def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, char2idx_dict, model, tokenizer,is_test=False):
+def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, char2idx_dict,is_test=False):
     para_limit = args.test_para_limit if is_test else args.para_limit
     ques_limit = args.test_ques_limit if is_test else args.ques_limit
     ans_limit = args.ans_limit
@@ -266,6 +266,9 @@ def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, 
     total = 0
     total_ = 0
     meta = {}
+    #new try
+    context = []
+    question=[]
     # context_idxs = []
     # context_char_idxs = []
     # ques_idxs = []
@@ -273,19 +276,19 @@ def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, 
     y1s = []
     y2s = []
     ids = []
-    if data_type=='train':
-        cont_embd = torch.empty(58577,500,100)
-        ques_embd = torch.empty(58577,50,100)
-    elif data_type=='dev':
-        cont_embd = torch.empty(6078,500,100)
-        ques_embd = torch.empty(6078,50,100)
-    elif data_type=='test':
-        cont_embd = torch.empty(6078,500,100)
-        ques_embd = torch.empty(6078,50,100)
+    # if data_type=='train':
+    #     cont_embd = torch.empty(58577,500,100)
+    #     ques_embd = torch.empty(58577,50,100)
+    # elif data_type=='dev':
+    #     cont_embd = torch.empty(6078,500,100)
+    #     ques_embd = torch.empty(6078,50,100)
+    # elif data_type=='test':
+    #     cont_embd = torch.empty(6078,500,100)
+    #     ques_embd = torch.empty(6078,50,100)
     count = 0
     for example, train_evals in tqdm(zip(examples,eval_eg.values())):
-        dum_c_em = torch.empty(500,100)
-        dum_q_em = torch.empty(50,100)
+        # dum_c_em = torch.empty(500,100)
+        # dum_q_em = torch.empty(50,100)
         total_ += 1
         #commenting for using PCE
         if drop_example(example, is_test):
@@ -293,22 +296,22 @@ def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, 
         # if total == 5:
         #     break
         total += 1
-        cnt = tokenizer([train_evals['context']], return_tensors="pt")
-        out_cnt = model(**cnt)
-        out_cnt = out_cnt.last_hidden_state[:,:,:100]
-        out_cnt = out_cnt[0]
-        dum_c_em[:out_cnt.size(0),:] = out_cnt
-        dum_c_em[out_cnt.size(0):,:] = 0
+        # cnt = tokenizer([train_evals['context']], return_tensors="pt")
+        # out_cnt = model(**cnt)
+        # out_cnt = out_cnt.last_hidden_state[:,:,:100]
+        # out_cnt = out_cnt[0]
+        # dum_c_em[:out_cnt.size(0),:] = out_cnt
+        # dum_c_em[out_cnt.size(0):,:] = 0
 
-        ques = tokenizer([train_evals['question']], return_tensors="pt")
-        out_ques = model(**ques)
-        out_ques = out_ques.last_hidden_state[:,:,:100]
-        out_ques = out_ques[0]
-        dum_q_em[:out_ques.size(0),:] = out_ques
-        dum_q_em[out_ques.size(0):,:] = 0
+        # ques = tokenizer([train_evals['question']], return_tensors="pt")
+        # out_ques = model(**ques)
+        # out_ques = out_ques.last_hidden_state[:,:,:100]
+        # out_ques = out_ques[0]
+        # dum_q_em[:out_ques.size(0),:] = out_ques
+        # dum_q_em[out_ques.size(0):,:] = 0
         
-        cont_embd[count,:,:] = dum_c_em
-        ques_embd[count,:,:] = dum_q_em
+        # cont_embd[count,:,:] = dum_c_em
+        # ques_embd[count,:,:] = dum_q_em
 
         count+=1
         # def _get_word(word):
@@ -354,7 +357,9 @@ def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, 
             start, end = example["y1s"][-1], example["y2s"][-1]
         else:
             start, end = -1, -1
-
+        
+        context.append(train_evals['context'])
+        question.append(train_evals['question'])
         y1s.append(start)
         y2s.append(end)
         ids.append(example["id"])
@@ -367,8 +372,10 @@ def build_features(args, examples, eval_eg, data_type, out_file, word2idx_dict, 
             #  context_char_idxs=np.array(context_char_idxs),
             #  ques_idxs=np.array(ques_idxs),
             #  ques_char_idxs=np.array(ques_char_idxs),
-             cntxp=cont_embd.detach().numpy(),
-             quesp=ques_embd.detach().numpy(),
+            #  cntxp=cont_embd.detach().numpy(),
+            #  quesp=ques_embd.detach().numpy(),
+             cont = context,
+             ques = question,
              y1s=np.array(y1s),
              y2s=np.array(y2s),
              ids=np.array(ids))
@@ -384,7 +391,7 @@ def save(filename, obj, message=None):
             json.dump(obj, fh)
 
 
-def pre_process(args,tokenizer,model):
+def pre_process(args):
     # Process training set and use it to decide on the word/character vocabularies
     word_counter, char_counter = Counter(), Counter()
     train_examples, train_eval = process_file(args.train_file, "train", word_counter, char_counter)
@@ -429,12 +436,12 @@ def pre_process(args,tokenizer,model):
     char2idx_dict={}
     # # Process dev and test sets
     dev_examples, dev_eval = process_file(args.dev_file, "dev", word_counter, char_counter)
-    train_meta = build_features(args, train_examples,train_eval, "train", args.train_record_file, word2idx_dict, char2idx_dict, model, tokenizer )
-    dev_meta = build_features(args, dev_examples,dev_eval, "dev", args.dev_record_file, word2idx_dict, char2idx_dict, model, tokenizer)
+    train_meta = build_features(args, train_examples,train_eval, "train", args.train_record_file, word2idx_dict, char2idx_dict )
+    dev_meta = build_features(args, dev_examples,dev_eval, "dev", args.dev_record_file, word2idx_dict, char2idx_dict)
     if args.include_test_examples:
         test_examples, test_eval = process_file(args.test_file, "test", word_counter, char_counter)
         save(args.test_eval_file, test_eval, message="test eval")
-        test_meta = build_features(args, test_examples,test_eval, "test",args.test_record_file, word2idx_dict, char2idx_dict,model, tokenizer , is_test=True)
+        test_meta = build_features(args, test_examples,test_eval, "test",args.test_record_file, word2idx_dict, char2idx_dict, is_test=True)
         save(args.test_meta_file, test_meta, message="test meta")
 
     # save(args.word_emb_file, word_emb_mat, message="word embedding")
@@ -455,8 +462,8 @@ if __name__ == '__main__':
 
     # Import spacy language model
     nlp = spacy.blank("en")
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    model = BertModel.from_pretrained('bert-base-uncased')
+    # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    # model = BertModel.from_pretrained('bert-base-uncased')
     # Preprocess dataset
     args_.train_file = url_to_data_path(args_.train_url)
     args_.dev_file = url_to_data_path(args_.dev_url)
@@ -465,4 +472,4 @@ if __name__ == '__main__':
     # glove_dir = url_to_data_path(args_.glove_url.replace('.zip', ''))
     # glove_ext = f'.txt' if glove_dir.endswith('d') else f'.{args_.glove_dim}d.txt'
     # args_.glove_file = os.path.join(glove_dir, os.path.basename(glove_dir) + glove_ext)
-    pre_process(args_,tokenizer,model)
+    pre_process(args_)

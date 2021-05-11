@@ -7,13 +7,14 @@ Author:
 import numpy as np
 import random
 import torch
+from transformers import BertTokenizer, BertModel
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as sched
 import torch.utils.data as data
 import util
-
+from torch.nn.utils.rnn import pad_sequence
 from args import get_train_args
 from collections import OrderedDict
 from json import dumps
@@ -42,12 +43,11 @@ def main(args):
 
     # Get embeddings
     log.info('Loading embeddings...')
-    word_vectors = util.torch_from_json(args.word_emb_file)
+    # word_vectors = util.torch_from_json(args.word_emb_file)
 
     # Get model
     log.info('Building model...')
-    model = BiDAF(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size,
+    model = BiDAF(hidden_size=args.hidden_size,
                   drop_prob=args.drop_prob)
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
@@ -90,6 +90,9 @@ def main(args):
     log.info('Training...')
     steps_till_eval = args.eval_steps
     epoch = step // len(train_dataset)
+    print('Initializing Bert model')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    bert_model = BertModel.from_pretrained('bert-base-uncased')
     while epoch != args.num_epochs:
         epoch += 1
         log.info(f'Starting epoch {epoch}...')
@@ -97,19 +100,45 @@ def main(args):
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, qw_idxs, y1, y2, ids in train_loader:
                 # Setup for forward
-                cw_idxs = cw_idxs.to(device)
-                qw_idxs = qw_idxs.to(device)
+                cnt_pad, ques_pad = [],[]
+                for ind in range(len(cw_idxs)):
+                    cnt = tokenizer([cw_idxs[ind]], return_tensors="pt")
+                    cnt = bert_model(**cnt)
+                    cnt = cnt.last_hidden_state[:,:,:50]
+                    cnt_pad.append(cnt[0])
+                    del cnt
+                    que = tokenizer([qw_idxs[ind]], return_tensors="pt")
+                    que = bert_model(**que)
+                    que = que.last_hidden_state[:,:,:50]
+                    ques_pad.append(que[0])
+                    del que
+                cnt_pad = pad_sequence(cnt_pad).transpose(0,1) 
+                ques_pad = pad_sequence(ques_pad).transpose(0,1)   
+                cw_idxs = cnt_pad.float().to(device)
+                qw_idxs = ques_pad.float().to(device)
+                print('deleting')
+                del cnt_pad
+                del ques_pad
+                print(cw_idxs.shape)
+                print(qw_idxs.shape)
+                # cw_idxs = cw_idxs.to(device)
+                # qw_idxs = qw_idxs.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
 
                 # Forward
+                print('forward starting')
                 log_p1, log_p2 = model(cw_idxs, qw_idxs)
+                print('forward done')
                 y1, y2 = y1.to(device), y2.to(device)
                 loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
                 loss_val = loss.item()
 
                 # Backward
+                print(f' checking model {next(model.parameters()).is_cuda}')
+                print('back prop st')
                 loss.backward()
+                print('back prop done')
                 nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
                 scheduler.step(step // batch_size)
@@ -135,7 +164,7 @@ def main(args):
                     results, pred_dict = evaluate(model, dev_loader, device,
                                                   args.dev_eval_file,
                                                   args.max_ans_len,
-                                                  args.use_squad_v2)
+                                                  args.use_squad_v2, bert_model,tokenizer)
                     saver.save(step, model, results[args.metric_name], device)
                     ema.resume(model)
 
@@ -155,7 +184,7 @@ def main(args):
                                    num_visuals=args.num_visuals)
 
 
-def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
+def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, bert_model, tokenizer):
     nll_meter = util.AverageMeter()
     model.eval()
     pred_dict = {}
@@ -165,8 +194,28 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             tqdm(total=len(data_loader.dataset)) as progress_bar:
         for cw_idxs, qw_idxs,y1, y2, ids in data_loader:
             # Setup for forward
-            cw_idxs = cw_idxs.to(device)
-            qw_idxs = qw_idxs.to(device)
+            
+            cnt_pad, ques_pad = [],[]
+            cnt_pad, ques_pad = [],[]
+            for ind in range(len(cw_idxs)):
+                cnt = tokenizer([cw_idxs[ind]], return_tensors="pt")
+                cnt = bert_model(**cnt)
+                cnt = cnt.last_hidden_state[:,:,:50]
+                cnt_pad.append(cnt[0])
+                del cnt
+                que = tokenizer([qw_idxs[ind]], return_tensors="pt")
+                que = bert_model(**que)
+                que = que.last_hidden_state[:,:,:50]
+                ques_pad.append(que[0])
+                del que
+            cnt_pad = pad_sequence(cnt_pad).transpose(0,1) 
+            ques_pad = pad_sequence(ques_pad).transpose(0,1)   
+            cw_idxs = cnt_pad.to(device)
+            qw_idxs = ques_pad.to(device)
+            del cnt_pad
+            del ques_pad
+            # cw_idxs = cw_idxs.to(device)
+            # qw_idxs = qw_idxs.to(device)
             batch_size = cw_idxs.size(0)
 
             # Forward

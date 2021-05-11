@@ -29,7 +29,7 @@ class BiDAF(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         drop_prob (float): Dropout probability.
     """
-    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
+    def __init__(self,  hidden_size, drop_prob=0.):
         super(BiDAF, self).__init__()
         # self.emb = layers.Embedding(word_vectors=word_vectors,
         #                             hidden_size=hidden_size,
