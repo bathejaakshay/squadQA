@@ -182,7 +182,92 @@ class BiDAFAttention(nn.Module):
         s = s0 + s1 + s2 + self.bias
 
         return s
+    
+    class CoAttention(nn.Module):
+    def __init__(self, hidden_size, drop_prob=0.1):
+        super(CoAttention, self).__init__()
+        self.hidden_size = hidden_size
+        self.l_1 = nn.Linear(2*hidden_size, 2*hidden_size,bias=True)
+        
+        self.bi_lstm = nn.LSTM(input_size=4*hidden_size, hidden_size=4*hidden_size, 
+                                bidirectional=True,batch_first=True)
 
+    def forward(self, c, q, c_mask, q_mask):
+        B = c.shape[0]
+        # q => (B, m, 2*H)
+        #print(self.hidden_size)
+        q_dash = self.l_1(q)
+        q_dash = torch.tanh(q_dash)
+        # q' => (B, m, 2*H) 
+
+        # c => (B, n, 2*H)
+        # (B, n, 2*H) * (B, 2*H, m)
+        L = torch.bmm(c, torch.transpose(q_dash, 1, 2))
+        # L => (B, n, m)
+
+        alpha = F.softmax(L, dim=2)
+        # alpha => (B, n, m)
+
+        a = torch.bmm(alpha, q_dash)
+        # a => (B, n, 2*H)
+
+        beta = F.softmax(L, dim=1)
+        # beta = (B, n, m)
+
+        # (B, m, n) * (B, n, 2*H)
+        b = torch.bmm(torch.transpose(beta, 1, 2), c) 
+        # b => (B, m, 2*H)
+
+        # (B, n, m) * (B, m, 2*H) 
+        s = torch.bmm(alpha, b)
+        # s => (B, n, 2*H)
+
+        attn = torch.cat((s, a), 2)
+        # attn => (B, n ,4*H)
+
+        device = torch.device("cuda:0")
+        h_0 = torch.zeros(2, B, 4*self.hidden_size).to(device)
+        c_0 = torch.zeros(2, B, 4*self.hidden_size).to(device)
+        u, (h_n, c_n) = self.bi_lstm(attn, (h_0, c_0))
+        # u => (B, n, 8*H)
+
+        return u
+
+
+class MultiAttention(nn.Module):
+    def __init__(self, hidden_size, drop_prob=0.1):
+        super(MultiAttention, self).__init__()
+        self.hidden_size = hidden_size
+        self.attn_1 = nn.MultiheadAttention(2*self.hidden_size, 4)
+        #self.attn_2 = nn.MultiheadAttention(2*self.hidden_size, 4)
+
+        self.bi_lstm_1 = nn.LSTM(input_size=2*hidden_size, hidden_size=4*hidden_size,
+                                bidirectional=True,batch_first=True)
+        #self.bi_lstm_2 = nn.LSTM(input_size=2*hidden_size, hidden_size=2*hidden_size, 
+        #                        bidirectional=True,batch_first=True)
+
+    def forward(self, c, q, c_mask, q_mask):
+        B = c.shape[0]
+        # c => (B, n, 2*H) 
+        c_dash = c.permute(1, 0, 2)
+        q_dash = q.permute(1, 0, 2)
+
+        attn_1_out, _ = self.attn_1(c_dash, q_dash, q_dash)
+        #attn_2_out, _ = self.attn_2(c_dash, q_dash, q_dash)
+
+        attn_1_out = attn_1_out.permute(1, 0, 2)
+        #attn_2_out = attn_2_out.permute(1, 0, 2)
+
+        device = torch.device("cuda:0")
+        h_0 = torch.zeros(2, B, 4*self.hidden_size).to(device)
+        c_0 = torch.zeros(2, B, 4*self.hidden_size).to(device)
+        
+        attn_1, (_, _) = self.bi_lstm_1(attn_1_out, (h_0, c_0))
+        #attn_2, (_, _) = self.bi_lstm_1(attn_2_out, (h_0, c_0))
+        
+        #u = torch.cat((attn_1, attn_2), 2)
+  
+        return attn_1
 
 class BiDAFOutput(nn.Module):
     """Output layer used by BiDAF for question answering.
